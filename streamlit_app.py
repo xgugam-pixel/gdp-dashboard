@@ -1,151 +1,160 @@
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
+import random
+import time
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+# Инициализация сессии (stateless-вайб для каждого игрока)
+if "user_iq" not in st.session_state:
+    st.session_state.user_iq = 100
+if "is_vip" not in st.session_state:
+    st.session_state.is_vip = False
+if "skins" not in st.session_state:
+    st.session_state.skins = ["Дефолтный Штрих"]
+if "auth" not in st.session_state:
+    st.session_state.auth = False
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# Функция-заглушка для теста интерфейса
+def ask_gemini_mock(subject: str, user_question: str) -> str:
+    mock_responses = {
+        "Математика": [
+            "Слушай сюда, эта теорема — полная имба. Пифагор просто затащил катку в геометрии. Короче, гипотенуза в квадрате — это как прокачанный Шелли на ульте, равна сумме катетов в квадрате!",
+            "Твой x и y — это как масик и тюбик, вечно ищут точки пересечения. Дискриминант больше нуля? Значит у тебя два сочных корня, катка выиграна, апнули IQ."
+        ],
+        "Русский язык": [
+            "Чувак, ставить запятые — это база. Если ты их ливаешь из текста, твоя учительница ловит жесткий кринж. Запомни: перед 'что', 'чтобы' и 'потому что' всегда ставим щит из запятой.",
+            "Жи-Ши пиши с буквой И. Кто пишет с Ы — тот официально забанен в Корпусе А. Это правило жесткое, как баланс бравлеров в новом сезоне."
+        ],
+        "Физика": [
+            "Сила трения — это когда ты пытаешься флексить новыми кроссами, но физика говорит 'не в эту смену'. Она буквально контрит твое движение, как замедление от Спайка.",
+            "Гравитация — это жесткий притягательный вайб Земли. Ты прыгаешь, но планета говорит: 'Куда намылился?' и притягивает тебя обратно со скоростью 9.8 м/с²."
+        ]
+    }
+    responses = mock_responses.get(subject, [
+        f"Ну ты выдал, конечно! Запрос про '{user_question}' — это мощно. Короче, тут всё просто: апаешь щиты и сдаешь домашку вовремя. Чистый флекс!",
+        f"По поводу '{user_question}': эксперты из Корпуса А поясняют, что это полная имба, если юзать с умом."
+    ])
+    return random.choice(responses)
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+# Логика определения Корпуса (Сезона)
+def get_korpus(iq):
+    if iq >= 140: return "Корпус А (Сигмы) 👑"
+    elif iq >= 120: return "Корпус Б (Масики) 🔥"
+    elif iq >= 100: return "Корпус В (Челики) 😐"
+    else: return "Корпус Г (Двоечники) 💀"
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
-
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
-
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
+# Окно авторизации (st.dialog)
+@st.dialog("Вход в Чит-код AI 🕶️")
+def login_dialog():
+    st.write("Добро пожаловать в ИИ-приложение для школьников!")
+    username = st.text_input("Введи свой никнейм из Brawl Stars:")
+    if st.button("Затащить в катку 🚀"):
+        if username:
+            st.session_state.username = username
+            st.session_state.auth = True
+            st.rerun()
         else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+            st.error("Без ника не пустим, чувак!")
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+# Проверка авторизации
+if not st.session_state.auth:
+    st.title("🤖 Чит-код AI")
+    st.write("Для старта нужно пройти быструю верификацию.")
+    if st.button("Открыть окно входа"):
+        login_dialog()
+    st.stop()
+
+# --- ОСНОВНОЙ ИНТЕРФЕЙС ПРИЛОЖЕНИЯ ---
+st.sidebar.title(f"Профиль: {st.session_state.username}")
+korpus_now = get_korpus(st.session_state.user_iq)
+st.sidebar.metric("Твой IQ Рейтинг 📊", f"{st.session_state.user_iq} PTS")
+st.sidebar.info(f"🏫 Твой Сезон: {korpus_now}")
+
+if st.sidebar.toggle("🔥 Активировать VIP (199р/мес)"):
+    st.session_state.is_vip = True
+    st.sidebar.success("VIP Статус: АКТИВЕН (Безлимитный ИИ)")
+else:
+    st.session_state.is_vip = False
+
+page = st.sidebar.radio("Куда летим?", ["Чат по /предметам", "Мемный Судья (Фарм IQ)", "Мегаящик 🎰", "Мои Скины 👑"])
+
+# 1. ЧАТ С ИИ
+if page == "Чат по /предметам":
+    st.title("🤖 Чит-код AI: Объяснение на пальцах")
+    subject = st.selectbox("Выбери предмет:", ["Математика", "Русский язык", "Физика", "История", "Химия"])
+    user_input = st.text_input("Что тебе непонятно? (Например: Объясни теорему Пифагора)")
+    
+    if st.button("Сгенерировать Чит-Код 🚀"):
+        if user_input:
+            if not st.session_state.is_vip and st.session_state.user_iq <= 80:
+                st.error("⚠️ Кринж! Твой IQ упал до 80! Ниже падать нельзя. Иди апай IQ в Мемного Судью или купи VIP!")
+            else:
+                with st.spinner("ИИ переводит учебник на язык штрихов..."):
+                    time.sleep(1) # Имитация загрузки
+                    answer = ask_gemini_mock(subject, user_input)
+                
+                if not st.session_state.is_vip:
+                    st.session_state.user_iq = max(80, st.session_state.user_iq - 2)
+                    st.toast("⚡ -2 IQ за запрос (С VIP было бы бесплатно)")
+                
+                st.chat_message("user").write(user_input)
+                st.chat_message("assistant").write(answer)
+
+# 2. МЕМНЫЙ СУДЬЯ
+elif page == "Мемный Судья (Фарм IQ)":
+    st.title("⚖️ Мемный Судья: База или Кринж?")
+    st.write("Быстро оценивай ситуации и зарабатывай IQ!")
+    
+    memes = [
+        "Учительница ставит 5 за то, что ты принес ей мем про Brawl Stars.",
+        "Твой друг списал домашку у ChatGPT, но забыл стереть фразу 'Как искусственный интеллект, я...'",
+        "Ты апнул Корпус А (Сигмы) за первую неделю учебы.",
+        "Ученик ливнул с контрольной по физике через окно первого этажа."
+    ]
+    
+    if "current_meme" not in st.session_state:
+        st.session_state.current_meme = random.choice(memes)
+        
+    st.info(f"Ситуация: {st.session_state.current_meme}")
+    
+    col1, col2 = st.columns(2)
+    if col1.button("🟢 БАЗА (+5 IQ)"):
+        st.session_state.user_iq += 5
+        st.success("Правильно! Это чистая база.")
+        st.session_state.current_meme = random.choice(memes)
+        time.sleep(0.5)
+        st.rerun()
+        
+    if col2.button("🔴 КРИНЖ (+5 IQ)"):
+        st.session_state.user_iq += 5
+        st.success("Согласны, это полный кринж!")
+        st.session_state.current_meme = random.choice(memes)
+        time.sleep(0.5)
+        st.rerun()
+
+# 3. МЕГАЯЩИК
+elif page == "Мегаящик 🎰":
+    st.title("🎁 Симулятор Мегаящика")
+    st.write("Слей 20 IQ ради крутого скина! Испытай удачу!")
+    
+    if st.button("Открыть Мегаящик (Цена: 20 IQ) 💥"):
+        if st.session_state.user_iq - 20 < 80:
+            st.error("⚠️ Недостаточно IQ! Минимальный порог 80 очков, чтобы никто не обиделся. Иди фарми рейтинг!")
+        else:
+            st.session_state.user_iq -= 20
+            with st.spinner("Ящик трясется... Внутри что-то мигает..."):
+                time.sleep(1.5)
+            
+            loot_pool = ["Скин: Золотой Сигма Леон 🦁", "Скин: Масик Эль Примо 🌹", "Скин: Альтушка Нани 💅", "Скин: Тюбик Поко 💀"]
+            won_skin = random.choice(loot_pool)
+            
+            if won_skin not in st.session_state.skins:
+                st.session_state.skins.append(won_skin)
+            
+            st.balloons() # Салют st.balloons прямо на лету!
+            st.success(f"🎉 ПРЕДМЕТОВ: 1! Тебе выпал {won_skin}!")
+
+# 4. МОИ СКИНЫ
+elif page == "Мои Скины 👑":
+    st.title("👕 Твой гардероб для флекса")
+    st.write("Все твои открытые скины из Мегаящика:")
+    for skin in st.session_state.skins:
+        st.write(f"- {skin}")
