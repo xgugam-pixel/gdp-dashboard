@@ -1,51 +1,66 @@
 import streamlit as st
-import random
+import time
+from google import genai
+from google.genai import types
 
-st.set_page_config(page_title="Cheat Code AI")
+# Инициализация живого клиента Gemini через секреты хостинга
+def get_gemini_client():
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        return genai.Client(api_key=api_key)
+    except Exception:
+        return None
 
-if "user_iq" not in st.session_state:
-    st.session_state.user_iq = 100
-if "skins" not in st.session_state:
-    st.session_state.skins = ["Defolt"]
+# Скрипт запуска чата (эту функцию мы вызовем в главном файле)
+def run_chat():
+    st.title("🤖 Чит-код AI: База от экспертов")
+    st.write("Спроси ИИ о любой сложной теме. Он переведет это на язык Сигм!")
 
-st.sidebar.title("Profil")
-st.sidebar.write(f"IQ: {st.session_state.user_iq} PTS")
+    subject = st.selectbox("Выбери предмет для настройки ответа:", 
+                           ["Математика", "Русский язык", "Физика", "История", "Химия"])
 
-page = st.sidebar.radio("Menu", ["Chat", "Test", "Box", "Skins"])
+    # Показываем историю переписки лентой
+    for role, text in st.session_state.chat_history:
+        with st.chat_message(role):
+            st.write(text)
 
-if page == "Chat":
-    st.title("Chat s II")
-    user_input = st.text_input("Vopros:")
-    if st.button("Otvetit"):
-        if user_input:
-            st.write(f"II: Pro {user_input} - eto baza! Glavnoe ne lovit krizh.")
-            st.session_state.user_iq = max(80, st.session_state.user_iq - 2)
+    # Строка ввода сообщения внизу экрана
+    user_input = st.chat_input("Напиши свой вопрос сюда...")
 
-elif page == "Test":
-    st.title("Test na Sigmu")
-    st.write("Edgar prygaet v tolpu s 10 bankami. Chto eto?")
-    if st.button("Eto BAZA"):
-        st.session_state.user_iq += 10
-        st.success("Pravilno! +10 IQ")
-    if st.button("Eto KRINZH"):
-        st.session_state.user_iq = max(80, st.session_state.user_iq - 5)
-        st.error("Oshibka! -5 IQ")
-
-elif page == "Box":
-    st.title("Megabox")
-    if st.button("Открыть за 20 IQ"):
-        if st.session_state.user_iq - 20 < 80:
-            st.error("Malo IQ! Minimum 80.")
+    if user_input:
+        if not st.session_state.is_vip and st.session_state.user_iq <= 80:
+            st.error("Твой IQ упал до 80! Иди апай рейтинг в Мемный Судья!")
         else:
-            st.session_state.user_iq -= 20
-            loot = ["Sigma Leon", "Masik Primo", "Altushka Nani", "Gigachad Mortis"]
-            won = random.choice(loot)
-            if won not in st.session_state.skins:
-                st.session_state.skins.append(won)
-            st.balloons()
-            st.success(f"Vypal skin: {won}!")
+            # Отображаем вопрос школьника
+            with st.chat_message("user"):
+                st.write(user_input)
+            st.session_state.chat_history.append(("user", user_input))
 
-elif page == "Skins":
-    st.title("Tvoi Skins")
-    for s in st.session_state.skins:
-        st.write(f"- {s}")
+            # Обращение к настоящему ИИ Gemini
+            with st.spinner("ИИ думает над чит-кодом..."):
+                client = get_gemini_client()
+                if client:
+                    try:
+                        # Системная инструкция внутри запроса
+                        prompt = f"Ты Чит-код AI для школьников. Объясни предмет {subject} на молодежном сленге (сигма, кринж, база, имба, масик). Пиши коротко, разбивай по строкам. Вопрос: {user_input}"
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=prompt
+                        )
+                        answer = response.text
+                    except Exception as e:
+                        answer = f"Ошибка подключения к Gemini: {str(e)}"
+                else:
+                    # Утешительный ответ, если ключ еще не вставлен в настройки
+                    answer = f"Бот-заглушка: Тема {subject} - это полная имба! Чтобы получить настоящий ответ от Gemini, добавь API-ключ в настройки Secrets."
+
+            # Отображаем ответ ИИ
+            with st.chat_message("assistant"):
+                st.write(answer)
+            st.session_state.chat_history.append(("assistant", answer))
+
+            # Списание баллов за вопрос
+            if not st.session_state.is_vip:
+                st.session_state.user_iq = max(80, st.session_state.user_iq - 2)
+
+            st.rerun()
