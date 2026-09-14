@@ -150,12 +150,4 @@ elif page == "Мегаящик 🎰":
                 st.session_state.skins.append(won_skin)
             
             st.balloons() # Салют st.balloons прямо на лету!
-            st.success(f"🎉 ПРЕДМЕТОВ: 1! Тебе выпал {won_skin}!")
-
-# 4. МОИ СКИНЫ
-elif page == "Мои Скины 👑":
-    st.title("👕 Твой гардероб для флекса")skin}")
-
-    st.write("Все твои открытые скины из Мегаящика:")
-    for skin in st.session_
-        st.write(f"- {
+            st.success(f"🎉 ПРЕДМЕТОВ: 1! Тебе выпал
