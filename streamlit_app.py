@@ -154,7 +154,8 @@ elif page == "Мегаящик 🎰":
 
 # 4. МОИ СКИНЫ
 elif page == "Мои Скины 👑":
-    st.title("👕 Твой гардероб для флекса")
+    st.title("👕 Твой гардероб для флекса")skin}")
+
     st.write("Все твои открытые скины из Мегаящика:")
-    for skin in st.session_state.skins:
-        st.write(f"- {skin}")
+    for skin in st.session_
+        st.write(f"- {
